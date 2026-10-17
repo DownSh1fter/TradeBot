@@ -56,3 +56,5 @@ Telegram: [Setup / Настройка](TELEGRAM.en.md)
 ## Bybit quote timestamp fix
 
 CCXT may return a Bybit ticker with a price but no timestamp. The bot then retrieves the order book and uses the best bid/ask midpoint with the book's exchange timestamp. Analysis reports `quote_source` as `orderbook_midpoint` or `ticker_last`. This is a sizing reference, not a guaranteed fill price. Quotes older than 60 seconds, in the future, missing exchange time or with invalid books are rejected. Local receipt time never replaces exchange time. If freshness checks still fail, verify automatic system clock synchronization and network latency.
+
+[Demo entry/exit test / Проверка входа и выхода](DEMO_SMOKE.en.md)

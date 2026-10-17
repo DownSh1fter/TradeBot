@@ -25,3 +25,5 @@ Windows activation: `.venv\Scripts\Activate.ps1`.
 Результаты / Results: `reports/*.json` (ignored by Git).
 
 Telegram: [Настройка на русском](docs/TELEGRAM.ru.md) · [English setup](docs/TELEGRAM.en.md)
+
+Demo execution test: [RU](docs/DEMO_SMOKE.ru.md) · [EN](docs/DEMO_SMOKE.en.md)
