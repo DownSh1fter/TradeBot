@@ -3,10 +3,12 @@
 [Русская документация](docs/README.ru.md) · [English documentation](docs/README.en.md)
 
 Симулятор фьючерсной стратегии EMA/ATR на публичных свечах Binance и Bybit.
-Он не отправляет ордера и не требует API-ключей. Каждый запуск выполняет один исторический бэктест одной биржи.
+Поддерживает бэктест, анализ рынка с paper-сделками и ордера Bybit Demo. Реальной торговли нет.
+
+[Анализатор и Bybit Demo — RU](docs/REALTIME.ru.md) · [Real-time analysis and Bybit Demo — EN](docs/REALTIME.en.md)
 
 A futures EMA/ATR strategy simulator using public Binance and Bybit candles.
-It does not place orders or require API keys. Each invocation runs one historical backtest on one exchange.
+Supports backtesting, polling with paper execution and Bybit Demo orders. Real-money trading is not implemented.
 
 Python 3.11+:
 

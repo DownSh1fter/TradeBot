@@ -10,17 +10,30 @@ from .simulator import RiskConfig, simulate
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Paper-only futures strategy simulator")
+    parser = argparse.ArgumentParser(description="Futures backtest, realtime paper analysis and Bybit Demo execution")
     parser.add_argument("--exchange", choices=["binance", "bybit"], required=True)
     parser.add_argument("--symbol", default="BTC/USDT:USDT")
     parser.add_argument("--timeframe", default="15m")
     parser.add_argument("--limit", type=int, default=1000)
     parser.add_argument("--equity", type=float, default=10_000)
+    parser.add_argument('--mode', choices=['backtest', 'realtime-paper', 'bybit-demo'], default='backtest')
+    parser.add_argument('--poll-seconds', type=float, default=10)
+    parser.add_argument('--cycles', type=int, default=0, help='Realtime polls; 0 runs until Ctrl+C')
+    parser.add_argument('--state', default='reports/realtime-state.json')
     args = parser.parse_args()
     if not 60 <= args.limit <= 1500:
         parser.error("--limit must be between 60 and 1500")
     if not math.isfinite(args.equity) or args.equity <= 0:
         parser.error("--equity must be positive")
+
+    if args.mode in ('realtime-paper', 'bybit-demo'):
+        from .realtime import run
+        try:
+            run(args.exchange, args.symbol, args.timeframe, args.limit, args.equity,
+                args.state, args.poll_seconds, args.cycles, demo=args.mode == 'bybit-demo')
+        except KeyboardInterrupt:
+            print('Stopped. State retained. Check Bybit Demo for open positions when using demo mode.')
+        return
 
     candles = fetch_candles(args.exchange, args.symbol, args.timeframe, args.limit)
     if len(candles) < 60:

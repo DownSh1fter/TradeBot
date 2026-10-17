@@ -2,6 +2,8 @@
 
 [Русский](README.ru.md) · [Home](../README.md)
 
+See [real-time analysis and Bybit Demo](REALTIME.en.md) for the new polling and Demo execution modes. The historical-mode guide follows.
+
 ## Purpose and requirements
 
 This is a historical, paper-only futures simulator, not a continuously running trading service. It downloads public OHLCV candles from Binance or Bybit through CCXT, calculates signals and simulates trades. No account, API key, database or background service is required. Python 3.11+ and HTTPS access to the exchange are required. The two exchanges run separately; this is not an arbitrage bot.
@@ -61,7 +63,7 @@ JSON is written relative to the current directory: `reports/<exchange>_<symbol>_
 
 Fields include starting/final equity, net PnL and return fraction, trade count, win rate (fraction), fees, halted UTC days and trades with side, prices, quantity, times (Unix milliseconds), net PnL and exit reason. `max_drawdown_fraction` measures realized equity at trade exits, not intratrade mark-to-market drawdown. Multiply fractions by 100 for percentages. Gross PnL is not a separate report field; net PnL plus fees gives PnL before fees, still including slippage.
 
-Funding, liquidation, margin accounting, order-book liquidity, exchange lot sizes and minimum orders are not modeled. Position size assumes linear price PnL; use linear USDT contracts for meaningful units. OHLC candles cannot reproduce the full intrabar price path. Short samples and these assumptions cannot establish future profitability. There is no live trading, testnet integration, scheduler or automatic portfolio across exchanges.
+Funding, liquidation, margin accounting, order-book liquidity, exchange lot sizes and minimum orders are not modeled. Position size assumes linear price PnL; use linear USDT contracts for meaningful units. OHLC candles cannot reproduce the full intrabar price path. Short samples and these assumptions cannot establish future profitability. The historical mode has no order execution or automatic portfolio across exchanges; Bybit Demo execution is documented separately.
 
 ## Tests and troubleshooting
 
