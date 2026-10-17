@@ -23,3 +23,5 @@ python -m dual_futures_bot --exchange bybit --symbol BTC/USDT:USDT --timeframe 1
 Windows activation: `.venv\Scripts\Activate.ps1`.
 
 Результаты / Results: `reports/*.json` (ignored by Git).
+
+Telegram: [Настройка на русском](docs/TELEGRAM.ru.md) · [English setup](docs/TELEGRAM.en.md)

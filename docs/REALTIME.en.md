@@ -50,3 +50,5 @@ Missed signals during downtime are not replayed: only the latest closed candle i
 ## Connectivity and validation
 
 Allow HTTPS to `api-demo.bybit.com` and `api.bybit.com`; CCXT metadata may require additional hosts. Keep TLS verification enabled. This cloud has network restrictions and no Demo keys. Offline logic and mocked API adapter tests pass, but actual market retrieval/Demo order submission remain unverified. Start with small virtual equity and inspect results in the Bybit UI.
+
+Telegram: [Setup / Настройка](TELEGRAM.en.md)

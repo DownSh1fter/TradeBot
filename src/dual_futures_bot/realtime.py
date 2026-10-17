@@ -96,7 +96,12 @@ def run(exchange_id, symbol, timeframe, limit, equity, state_path, poll_seconds=
     lock = path.with_suffix(path.suffix + '.lock')
     fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     exchange = None
+    notifier = None
     try:
+        from .telegram import Telegram
+        notifier = Telegram.from_env()
+        notifier.send('Запуск / Starting', {'exchange': exchange_id, 'symbol': symbol, 'timeframe': timeframe,
+                                          'mode': 'bybit_demo' if demo else 'realtime_paper'})
         identity = dict(exchange=exchange_id, symbol=symbol, timeframe=timeframe, mode='bybit_demo' if demo else 'realtime_paper', risk=asdict(config))
         state = json.loads(path.read_text()) if path.exists() else dict(identity=identity, equity=equity, position=None, events=[])
         if state['identity'] != identity:
@@ -143,10 +148,29 @@ def run(exchange_id, symbol, timeframe, limit, equity, state_path, poll_seconds=
                 events = step(state, analysis, float(ticker['last']), now, config)
                 save(state)
             print(json.dumps(dict(analysis=analysis, paper_equity=None if demo else state['equity'], events=events)), flush=True)
+            try:
+                notifier.update(symbol, identity['mode'], analysis, float(ticker['last']), state, events)
+            except Exception:
+                # Observability must not interrupt execution or expose token-bearing errors.
+                print('Telegram notification formatting failed; check local state.', flush=True)
             count += 1
             if not cycles or count < cycles:
                 time.sleep(poll_seconds)
+    except KeyboardInterrupt:
+        if notifier:
+            notifier.send('Остановлен / Stopped', {'note': 'Polling stopped. Positions/orders are NOT closed.'})
+        raise
+    except Exception as exc:
+        if notifier:
+            notifier.send('Ошибка / Error', {'error_type': type(exc).__name__,
+                                          'note': 'Bot stopped. Check local logs and Bybit positions/orders. No automatic order retry.'})
+        raise
+    else:
+        if notifier:
+            notifier.send('Завершён / Finished', {'note': 'Requested cycles completed. Positions/orders are NOT closed.'})
     finally:
+        if notifier:
+            notifier.close()
         os.close(fd)
         lock.unlink(missing_ok=True)
         if exchange is not None:

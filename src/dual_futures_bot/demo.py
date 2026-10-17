@@ -41,6 +41,8 @@ def demo_action(exchange, symbol, analysis, price, config, state, save):
     total = float(balance['USDT']['total'])
     if not math.isfinite(total) or total <= 0:
         raise ValueError('Demo account requires positive USDT equity')
+    state['demo_equity'] = total
+    state['demo_positions'] = [{k: p.get(k) for k in ('side', 'contracts', 'entryPrice', 'markPrice', 'unrealizedPnl', 'stopLossPrice', 'leverage')} for p in active]
     day = exchange.milliseconds() // 86_400_000
     if state.get('demo_day') != day:
         state.update(demo_day=day, demo_day_equity=total, demo_halted=False)
@@ -88,7 +90,9 @@ def demo_action(exchange, symbol, analysis, price, config, state, save):
         confirmed = [p for p in exchange.fetch_positions([symbol]) if float(p.get('contracts') or 0) > 0]
         if len(confirmed) != 1 or not confirmed[0].get('stopLossPrice'):
             raise ValueError('Demo position stop is unconfirmed; inspect position and pending_order in Bybit')
-    event = dict(type='demo_order', id=order['id'], client_id=params['orderLinkId'], status=status['status'])
+    event = dict(type='demo_order', id=order['id'], client_id=params['orderLinkId'], status=status['status'],
+                 side=side, amount=amount, filled=status.get('filled'), average=status.get('average'),
+                 cost=status.get('cost'), fee=status.get('fee'), reduce_only=params.get('reduceOnly', False))
     state['events'].append(event)
     state['pending_order'] = None
     save(state)
