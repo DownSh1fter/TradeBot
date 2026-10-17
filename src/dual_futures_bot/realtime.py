@@ -12,6 +12,30 @@ from .simulator import RiskConfig, size_for_risk
 from .strategy import ema_cross_signals
 
 
+def fetch_quote(exchange, symbol):
+    """Use a timestamped order-book midpoint when ticker time is unavailable."""
+    ticker = exchange.fetch_ticker(symbol)
+    if ticker.get('timestamp') is None:
+        book = exchange.fetch_order_book(symbol, limit=1)
+        if not book.get('bids') or not book.get('asks'):
+            raise ValueError('quote order book is empty')
+        bid, ask = float(book['bids'][0][0]), float(book['asks'][0][0])
+        if not all(math.isfinite(p) and p > 0 for p in (bid, ask)) or bid > ask:
+            raise ValueError('quote order book has invalid bid/ask')
+        ticker = {'timestamp': book.get('timestamp'), 'last': (bid + ask) / 2,
+                  'source': 'orderbook_midpoint'}
+    else:
+        ticker = dict(ticker, source='ticker_last')
+    now = exchange.milliseconds()
+    timestamp = ticker.get('timestamp')
+    if timestamp is None or not isinstance(timestamp, (int, float)) or not math.isfinite(timestamp) or not 0 <= now - timestamp <= 60_000:
+        raise ValueError('quote missing exchange timestamp or older than 60 seconds; check system clock')
+    price = float(ticker['last'])
+    if not math.isfinite(price) or price <= 0:
+        raise ValueError('invalid quote price')
+    return ticker
+
+
 def analyze(candles, now_ms, interval_ms):
     if len(candles) < 60:
         raise ValueError('at least 60 closed candles required')
@@ -125,12 +149,10 @@ def run(exchange_id, symbol, timeframe, limit, equity, state_path, poll_seconds=
             now = exchange.milliseconds()
             candles = [Candle(*row) for row in rows if row[0] + interval <= now]
             analysis = analyze(candles, now, interval)
-            ticker = exchange.fetch_ticker(symbol)
-            quote_time = ticker.get('timestamp')
+            ticker = fetch_quote(exchange, symbol)
             now = exchange.milliseconds()
             analysis = analyze(candles, now, interval)
-            if quote_time is None or not 0 <= now - quote_time <= 60_000:
-                raise ValueError('quote missing timestamp or older than 60 seconds')
+            analysis['quote_source'] = ticker['source']
             def save(data):
                 temporary = path.with_suffix(path.suffix + '.tmp')
                 with temporary.open('w') as output:
