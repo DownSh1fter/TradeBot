@@ -109,7 +109,7 @@ def step(state, analysis, price, now_ms, config):
     return events
 
 
-def run(exchange_id, symbol, timeframe, limit, equity, state_path, poll_seconds=10, cycles=0, demo=False):
+def run(exchange_id, symbol, timeframe, limit, equity, state_path, poll_seconds=10, cycles=0, demo=False, ai_report=None):
     import ccxt
     config = RiskConfig(initial_equity=equity)
     config.validate()
@@ -153,6 +153,9 @@ def run(exchange_id, symbol, timeframe, limit, equity, state_path, poll_seconds=
             now = exchange.milliseconds()
             analysis = analyze(candles, now, interval)
             analysis['quote_source'] = ticker['source']
+            if ai_report:
+                from .ai_advisor import load_report
+                analysis['ai_advisor'] = load_report(ai_report, exchange_id, symbol, timeframe, now)
             def save(data):
                 temporary = path.with_suffix(path.suffix + '.tmp')
                 with temporary.open('w') as output:

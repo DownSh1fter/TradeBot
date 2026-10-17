@@ -20,6 +20,7 @@ def main() -> None:
     parser.add_argument('--poll-seconds', type=float, default=10)
     parser.add_argument('--cycles', type=int, default=0, help='Realtime polls; 0 runs until Ctrl+C')
     parser.add_argument('--state', default='reports/realtime-state.json')
+    parser.add_argument('--ai-report', help='Optional local Ollama observer report; never changes orders')
     args = parser.parse_args()
     if not 60 <= args.limit <= 1500:
         parser.error("--limit must be between 60 and 1500")
@@ -30,7 +31,7 @@ def main() -> None:
         from .realtime import run
         try:
             run(args.exchange, args.symbol, args.timeframe, args.limit, args.equity,
-                args.state, args.poll_seconds, args.cycles, demo=args.mode == 'bybit-demo')
+                args.state, args.poll_seconds, args.cycles, demo=args.mode == 'bybit-demo', ai_report=args.ai_report)
         except KeyboardInterrupt:
             print('Stopped. State retained. Check Bybit Demo for open positions when using demo mode.')
         return

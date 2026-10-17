@@ -7,3 +7,7 @@ reports/*.json
 *.egg-info/
 build/
 dist/
+
+reports/*.jsonl
+reports/*.lock
+reports/*.tmp

@@ -27,3 +27,5 @@ Windows activation: `.venv\Scripts\Activate.ps1`.
 Telegram: [Настройка на русском](docs/TELEGRAM.ru.md) · [English setup](docs/TELEGRAM.en.md)
 
 Demo execution test: [RU](docs/DEMO_SMOKE.ru.md) · [EN](docs/DEMO_SMOKE.en.md)
+
+Local Ollama observer: [RU](docs/AI.ru.md) · [EN](docs/AI.en.md) (advisory only; no order control).
