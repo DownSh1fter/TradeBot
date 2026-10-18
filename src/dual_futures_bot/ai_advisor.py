@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import os
+import sys
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -24,7 +25,7 @@ Use only supplied market data and dated headlines. Do not invent events or fetch
 Distinguish correlations from evidence. Headlines may be wrong, incomplete, or irrelevant.
 Return ONLY a JSON object with these keys:
 bias: bullish|bearish|neutral; confidence: number from 0 to 1 (subjective, NOT win probability);
-summary: Russian explanation <=1200 characters; risks: list of <=6 short Russian strings;
+summary: concise Russian explanation <=600 characters; risks: list of <=4 Russian strings, each <=120 characters;
 news_ids: list of IDs from supplied headlines supporting your assessment.
 Discuss conflicting timeframes, liquidity/volume limitations and trading costs.
 Do not recommend leverage, position sizes or promise profits. No trade action is requested.'''
@@ -112,13 +113,20 @@ def validate_answer(value, allowed_ids):
     return value
 
 
-def ask_ollama(session, model, payload):
+class TruncatedModelResponse(ValueError):
+    pass
+
+
+def ask_ollama(session, model, payload, timeout=300, max_tokens=512):
     response = session.post('http://127.0.0.1:11434/api/chat', json={
-        'model': model, 'stream': False, 'format': 'json', 'options': {'temperature': 0, 'num_predict': 900, 'num_ctx': 8192},
+        'model': model, 'stream': False, 'format': 'json', 'options': {'temperature': 0, 'num_predict': max_tokens, 'num_ctx': 8192},
         'messages': [{'role': 'system', 'content': SYSTEM},
-                     {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False, allow_nan=False)}]}, timeout=(5, 120))
+                     {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False, allow_nan=False)}]}, timeout=(5, timeout))
     response.raise_for_status()
-    content = response.json()['message']['content']
+    result = response.json()
+    if result.get('done_reason') == 'length':
+        raise TruncatedModelResponse('Model response reached output limit')
+    content = result['message']['content']
     if len(content) > 16000:
         raise ValueError('Model output too large')
     return validate_answer(json.loads(content), {n['id'] for n in payload['headlines']})
@@ -147,12 +155,16 @@ def main():
     parser.add_argument('--symbol', default='BTC/USDT:USDT')
     parser.add_argument('--timeframe', default='15m')
     parser.add_argument('--model', default='qwen2.5:3b')
+    parser.add_argument('--timeout', type=int, default=300, help='Ollama read timeout in seconds, 30..540')
+    parser.add_argument('--max-tokens', type=int, default=512, help='Maximum generated tokens, 256..2048')
     parser.add_argument('--feed', action='append', help='Repeat for up to 5 HTTPS RSS/Atom feeds')
     parser.add_argument('--report', default='reports/ai-advisor.json')
     parser.add_argument('--history', default='reports/ai-history.jsonl')
     parser.add_argument('--interval', type=int, default=300)
     parser.add_argument('--cycles', type=int, default=0)
     args = parser.parse_args()
+    if not 30 <= args.timeout <= 540 or not 256 <= args.max_tokens <= 2048:
+        parser.error('timeout must be 30..540 seconds; max-tokens must be 256..2048')
     if args.interval < 60 or args.cycles < 0 or (args.feed and len(args.feed) > 5):
         parser.error('interval >= 60, cycles >= 0, and at most 5 feeds required')
     path = Path(args.report)
@@ -168,21 +180,31 @@ def main():
             report = dict(exchange=args.exchange, symbol=args.symbol, timeframe=args.timeframe,
                           model=args.model, status='error', advisory_only=True)
             try:
+                print('AI: loading public market data...', file=sys.stderr, flush=True)
                 frames = list(dict.fromkeys([args.timeframe, '1h']))
                 candles = {frame: fetch_candles(args.exchange, args.symbol, frame, 200) for frame in frames}
                 data_at = int(time.time() * 1000)
                 market = {frame: features(rows, data_at, frame) for frame, rows in candles.items()}
+                print('AI: loading news feeds...', file=sys.stderr, flush=True)
                 headlines, coverage = collect_news(session, args.feed or DEFAULT_FEEDS, data_at)
                 payload = dict(symbol=args.symbol, market=market, data_at=data_at, headlines=headlines,
                                news_coverage=coverage, costs='Paper defaults: 0.05% fee and 0.02% slippage per side; funding excluded')
-                assessment = ask_ollama(local_session, args.model, payload)
+                print(f'AI: waiting for Ollama ({args.model}, read timeout {args.timeout}s, max output {args.max_tokens} tokens)...', file=sys.stderr, flush=True)
+                assessment = ask_ollama(local_session, args.model, payload, timeout=args.timeout, max_tokens=args.max_tokens)
                 if int(time.time()*1000) - data_at > 600_000:
                     raise ValueError('Inference result is stale')
                 report.update(status='ok', data_at=data_at, assessment=assessment, headlines=headlines,
                               news_coverage=coverage, market=market)
             except Exception as exc:
                 # Never print request bodies or arbitrary remote responses.
-                report.update(error_type=type(exc).__name__, data_at=int(time.time()*1000))
+                hint = 'Check Ollama logs, model installation, market access and response schema.'
+                if isinstance(exc, requests.Timeout):
+                    hint = 'Ollama or a news request timed out. Check the last progress line; try a smaller model or increase --timeout (maximum 540).'
+                elif isinstance(exc, TruncatedModelResponse):
+                    hint = 'Model output was truncated. Increase --max-tokens (for example 768); a smaller model can generate it faster.'
+                elif isinstance(exc, requests.HTTPError):
+                    hint = 'An API returned an error. Check Ollama logs and that the model is installed; RSS failures are listed separately.'
+                report.update(error_type=type(exc).__name__, hint=hint, data_at=int(time.time()*1000))
             history = Path(args.history)
             history.parent.mkdir(parents=True, exist_ok=True)
             with history.open('a') as output:

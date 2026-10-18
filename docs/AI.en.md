@@ -76,3 +76,15 @@ Small profits are not guaranteed; small frequent targets are particularly cost-s
 https://github.com/Alishahryar1/free-claude-code routes providers for coding assistants; it supplies neither market intelligence nor news. Direct Ollama does not require it. Its code/installers were not included or executed.
 
 Offline tests cover response schema, supplied news references, RSS/Atom dates, unavailable feeds, report freshness and tool-free Ollama requests. Actual Ollama inference and live RSS retrieval remain unverified in the cloud. Download/test the model on your Mac. No profitability improvement has been established.
+
+## Slow Ollama / cancellation after two minutes
+
+The early client used a 120-second read timeout. CPU prompt processing plus generation can exceed it. The updated observer prints progress stages, uses a 300-second default Ollama read timeout and a shorter 512-token output budget. HTTP 500 next to a two-minute cancellation can follow client timeout, though other 500 errors require checking server logs.
+
+```bash
+python -m dual_futures_bot.ai_advisor --exchange bybit --timeframe 15m --cycles 1 --timeout 480 --max-tokens 512
+```
+
+`--timeout` accepts 30–540 seconds for the Ollama response, not total analysis duration. `--max-tokens` accepts 256–2048 (default 512). If the model reaches the output limit, `TruncatedModelResponse` suggests increasing to 768 tokens. A longer timeout does not improve speed. The ten-minute input freshness limit remains enforced.
+
+A smaller model can help: `ollama pull qwen2.5:1.5b`, then select `--model qwen2.5:1.5b`. Smaller models can reason/format less reliably. Avoid concurrent inference/observer processes. Local resource contention is possible, but the trading loop does not wait for inference.

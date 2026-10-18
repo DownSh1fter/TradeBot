@@ -95,3 +95,17 @@ class AdvisorTests(unittest.TestCase):
                 main()
             self.assertEqual(json.loads(report.read_text())['status'], 'error')
             self.assertEqual(len(history.read_text().splitlines()), 2)
+
+    def test_custom_timeout_and_output_budget(self):
+        session = Mock()
+        session.post.return_value.json.return_value = {'message': {'content': json.dumps(self.answer())}}
+        ask_ollama(session, 'local', {'headlines': [{'id': 'n1'}]}, timeout=480, max_tokens=768)
+        self.assertEqual(session.post.call_args.kwargs['timeout'], (5, 480))
+        self.assertEqual(session.post.call_args.kwargs['json']['options']['num_predict'], 768)
+
+    def test_truncated_output_rejected_even_if_json_valid(self):
+        from dual_futures_bot.ai_advisor import TruncatedModelResponse
+        session = Mock()
+        session.post.return_value.json.return_value = {'done_reason': 'length', 'message': {'content': json.dumps(self.answer())}}
+        with self.assertRaises(TruncatedModelResponse):
+            ask_ollama(session, 'local', {'headlines': [{'id': 'n1'}]})
