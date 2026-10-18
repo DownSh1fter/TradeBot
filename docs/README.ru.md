@@ -1,5 +1,7 @@
 # TradeBot — руководство на русском
 
+[Новый единый запуск и стратегия trend-pullback](REWORK.ru.md). Старые команды ниже сохраняют режим ema-cross, если стратегия не указана.
+
 [Полная пошаговая инструкция для Mac](START_HERE.ru.md)
 
 [English](README.en.md) · [Главная](../README.md)

@@ -1,5 +1,7 @@
 # Local Ollama market observer
 
+[New single-command operation and trend-pullback policy](REWORK.en.md). Older commands below retain ema-cross unless a strategy is selected.
+
 [Complete step-by-step Mac setup guide](START_HERE.en.md)
 
 [Русский](AI.ru.md) · [Main guide](README.en.md)
@@ -42,7 +44,7 @@ Continuous observation, without orders:
 python -m dual_futures_bot.ai_advisor --exchange bybit --timeframe 15m --model qwen2.5:3b
 ```
 
-`--interval 300` sets the pause between runs (minimum 60 seconds). Repeat `--feed https://example.org/feed.xml` to replace defaults with up to five actual RSS/Atom URLs. Redirects require configuring the final HTTPS feed address. Missing/invalid/timezone-free dates, future items and items older than a day are skipped; duplicate headlines are removed. Source failures are visible rather than silently fabricated.
+`--interval 300` sets the pause between runs (minimum 60 seconds). Repeat `--feed https://example.org/feed.xml` to replace defaults with up to five actual RSS/Atom URLs. Up to three HTTPS redirects are supported; HTTP downgrades are rejected. Missing/invalid/timezone-free dates, future items and items older than a day are skipped; duplicate headlines are removed. Source failures are visible rather than silently fabricated.
 
 ## Display next to trading output
 

@@ -109,3 +109,30 @@ class AdvisorTests(unittest.TestCase):
         session.post.return_value.json.return_value = {'done_reason': 'length', 'message': {'content': json.dumps(self.answer())}}
         with self.assertRaises(TruncatedModelResponse):
             ask_ollama(session, 'local', {'headlines': [{'id': 'n1'}]})
+
+    def test_relevance_filter_excludes_entertainment_without_claiming_truth(self):
+        from dual_futures_bot.ai_advisor import relevant_headlines
+        items=[{'title':'Bitcoin ETF inflows rise','id':'btc'}, {'title':'Central bank discusses interest rates','id':'macro'}, {'title':'Actor attends film festival','id':'noise'}]
+        result=relevant_headlines(items)
+        self.assertEqual([r['id'] for r in result],['btc','macro'])
+        self.assertEqual(result[0]['category'],'crypto')
+
+    def test_https_redirect_handled_without_downgrade(self):
+        from dual_futures_bot.ai_advisor import read_feed
+        def response(redirect=False,location=None):
+            value=Mock()
+            value.is_redirect=redirect
+            value.headers={'Location':location}
+            value.iter_content.return_value=[b'<rss/>']
+            value.__enter__=Mock(return_value=value)
+            value.__exit__=Mock(return_value=False)
+            return value
+        session=Mock()
+        session.get.side_effect=[response(True,'https://example.org/new.xml'),response()]
+        self.assertEqual(read_feed(session,'https://example.org/old'),b'<rss/>')
+        session.get.side_effect=[response(True,'http://example.org/insecure')]
+        with self.assertRaises(ValueError): read_feed(session,'https://example.org/old')
+
+    def test_model_cannot_cite_all_headlines_indiscriminately(self):
+        answer=dict(self.answer(),news_ids=['a','b','c','d'])
+        with self.assertRaises(ValueError): validate_answer(answer,{'a','b','c','d'})

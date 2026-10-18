@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dual-futures-bot"
-version = "0.1.0"
-description = "Paper-only futures strategy prototype for Binance and Bybit market data"
+version = "0.2.0"
+description = "Experimental futures research, paper execution and guarded Bybit Demo trading"
 requires-python = ">=3.11"
 dependencies = ["ccxt>=4.4.0"]
 

@@ -11,3 +11,5 @@ dist/
 reports/*.jsonl
 reports/*.lock
 reports/*.tmp
+
+reports/*.log

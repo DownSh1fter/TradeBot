@@ -1,1 +1,1 @@
-"""Paper-only multi-exchange futures strategy prototype."""
+"""Experimental futures research, paper trading and explicit Bybit Demo execution."""

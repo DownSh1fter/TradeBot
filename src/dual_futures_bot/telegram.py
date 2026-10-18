@@ -50,7 +50,7 @@ class Telegram:
         position = state.get('demo_positions') if mode == 'bybit_demo' else state.get('position')
         data = {'symbol': symbol, 'mode': mode, 'price': price, 'analysis': analysis,
                 'equity_USDT': state.get('demo_equity') if mode == 'bybit_demo' else state['equity'],
-                'position': position, 'entries_halted': state.get('demo_halted') if mode == 'bybit_demo' else state.get('halted', False)}
+                'position': position, 'decision': state.get('decision'), 'entries_halted': state.get('demo_halted') if mode == 'bybit_demo' else state.get('halted', False)}
         # Ignore fluctuating mark-to-market PnL when detecting position changes.
         signature = json.dumps([{k: p.get(k) for k in ('side', 'contracts', 'entryPrice')} for p in position], sort_keys=True) if isinstance(position, list) else json.dumps({k: position.get(k) for k in ('side', 'quantity', 'entry')} if position else None, sort_keys=True)
         changed = self.last_position is not None and signature != self.last_position

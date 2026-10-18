@@ -1,5 +1,7 @@
 # Market analysis and Bybit Demo
 
+[New single-command operation and trend-pullback policy](REWORK.en.md). Older commands below retain ema-cross unless a strategy is selected.
+
 [Complete step-by-step Mac setup guide](START_HERE.en.md)
 
 [Русский](REALTIME.ru.md) · [Main guide](README.en.md)
@@ -45,7 +47,7 @@ An opposite signal closes the position with `reduceOnly`; it does not immediatel
 
 Ctrl+C stops polling; **it does not close Demo positions or cancel orders**. Inspect them in Bybit. Paper positions persist and resume on restart. Paper stops do not run while stopped; an accepted Demo stop remains on the exchange.
 
-Network errors stop the process. Before order submission a `pending_order` containing `client_id` is persisted. Timeouts, unknown statuses or unconfirmed stops never trigger an automatic retry. Locate the order by this ID in Bybit and reconcile fills, position, stop and open orders. Only after reconciliation and stopping the process, back up the JSON and set `pending_order` to `null`. Do not delete the whole state, which could replay a signal. Protect or close any position with an unconfirmed stop through the Demo UI first.
+Network errors stop the process; rejected quote data skips the cycle as described below. Before order submission a `pending_order` containing `client_id` is persisted. Timeouts, unknown statuses or unconfirmed stops never trigger an automatic retry. Locate the order by this ID in Bybit and reconcile fills, position, stop and open orders. Only after reconciliation and stopping the process, back up the JSON and set `pending_order` to `null`. Do not delete the whole state, which could replay a signal. Protect or close any position with an unconfirmed stop through the Demo UI first.
 
 Missed signals during downtime are not replayed: only the latest closed candle is analyzed. Demo events store order IDs/statuses rather than complete accounting; inspect fills and PnL in Bybit. The JSON journal grows indefinitely; long-running deployments need separate storage.
 

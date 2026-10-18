@@ -81,8 +81,7 @@ class RealtimeTests(unittest.TestCase):
 
     def test_demo_reverse_reduce_only(self):
         ex = self.exchange()
-        ex.fetch_positions.side_effect = None
-        ex.fetch_positions.return_value = [{'contracts': 2, 'side': 'short', 'hedged': False}]
+        ex.fetch_positions.side_effect = [[{'contracts': 2, 'side': 'short', 'hedged': False}], []]
         demo_action(ex, 'BTC/USDT:USDT', self.analysis, 100, self.config, self.state, lambda s: None)
         self.assertTrue(ex.create_order.call_args.args[-1]['reduceOnly'])
         self.assertEqual(ex.create_order.call_args.args[2], 'buy')
@@ -168,3 +167,24 @@ class RealtimeTests(unittest.TestCase):
             execute.assert_not_called()
             ex.create_order.assert_not_called()
             self.assertFalse(path.exists())
+
+    def test_market_execution_lock_prevents_parallel_demo_states(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from dual_futures_bot.realtime import run
+        old=os.getcwd()
+        try:
+            with tempfile.TemporaryDirectory() as directory,patch('dual_futures_bot.demo.connect_demo') as connect:
+                os.chdir(directory)
+                guard=Path('reports/.execution_bybit_BTC_USDT_USDT.lock')
+                guard.parent.mkdir()
+                guard.write_text('existing-owner')
+                with self.assertRaises(FileExistsError):
+                    run('bybit','BTC/USDT:USDT','15m',200,1000,'reports/other-state.json',cycles=1,demo=True)
+                self.assertEqual(guard.read_text(),'existing-owner')
+                self.assertFalse(Path('reports/other-state.json.lock').exists())
+                connect.assert_not_called()
+        finally:
+            os.chdir(old)

@@ -3,7 +3,8 @@ from math import isfinite
 from collections.abc import Sequence
 
 from .indicators import atr
-from .models import Candle, Trade
+from .models import Candle, Trade, Signal
+from .policy import trend_decisions
 from .strategy import ema_cross_signals
 
 
@@ -48,7 +49,7 @@ def _adverse_price(price: float, side: str, is_entry: bool, slip: float) -> floa
     return price * (1 + slip if buy else 1 - slip)
 
 
-def simulate(candles: Sequence[Candle], config: RiskConfig = RiskConfig()) -> dict:
+def simulate(candles: Sequence[Candle], config: RiskConfig = RiskConfig(), strategy='ema-cross', trade_start_index=0) -> dict:
     config.validate()
     if len(candles) < 60:
         raise ValueError("at least 60 candles are required")
@@ -61,19 +62,28 @@ def simulate(candles: Sequence[Candle], config: RiskConfig = RiskConfig()) -> di
             raise ValueError("invalid OHLC range")
         if i and candle.timestamp <= candles[i - 1].timestamp:
             raise ValueError("candle timestamps must be strictly increasing")
-    signals = ema_cross_signals(candles)
+        if i and candle.timestamp-candles[i-1].timestamp != candles[1].timestamp-candles[0].timestamp:
+            raise ValueError("candle intervals must be continuous and uniform")
+    if strategy not in ('ema-cross', 'trend-pullback'):
+        raise ValueError('Unknown strategy')
+    decisions = trend_decisions(candles, 2*(config.fee_rate+config.slippage_rate)) if strategy == 'trend-pullback' else None
+    signals = ([Signal(d['signal'], c.timestamp, c.close, d['atr14']) if d['signal'] else None
+                for c, d in zip(candles, decisions)] if decisions is not None else ema_cross_signals(candles))
     atr_values = atr(candles, 14)
     equity = config.initial_equity
     peak = equity
     max_drawdown = 0.0
     trades: list[Trade] = []
     position: dict | None = None
+    last_exit_index = -1000
+    mark_peak = equity
+    mark_drawdown = 0.0
     day_start_equity = equity
     active_day = candles[0].timestamp // 86_400_000
     halted_days: set[int] = set()
 
     def close_position(price: float, candle: Candle, reason: str) -> None:
-        nonlocal position, equity, peak, max_drawdown
+        nonlocal position, equity, peak, max_drawdown, last_exit_index
         assert position is not None
         side = position["side"]
         exit_price = _adverse_price(price, side, False, config.slippage_rate)
@@ -87,9 +97,11 @@ def simulate(candles: Sequence[Candle], config: RiskConfig = RiskConfig()) -> di
         max_drawdown = max(max_drawdown, (peak - equity) / peak if peak > 0 else 0.0)
         trades.append(Trade(side, position["entry_time"], candle.timestamp, position["entry"], exit_price, position["qty"], fees, pnl, reason))
         position = None
+        last_exit_index = i
 
     for i in range(1, len(candles)):
         candle = candles[i]
+        decision = decisions[i-1] if decisions is not None else None
         day = candle.timestamp // 86_400_000
         if day != active_day:
             active_day = day
@@ -99,44 +111,70 @@ def simulate(candles: Sequence[Candle], config: RiskConfig = RiskConfig()) -> di
             gap_hit = candle.open <= position["stop"] if position["side"] == "long" else candle.open >= position["stop"]
             if gap_hit:
                 close_position(candle.open, candle, "trailing_stop")
+            elif decision is not None and ((position['side'] == 'long' and decision['exit_long']) or (position['side'] == 'short' and decision['exit_short'])):
+                close_position(candle.open, candle, 'trend_invalidated')
+            elif decision is not None and i-position['entry_index'] >= decision['max_hold_bars']:
+                close_position(candle.open, candle, 'max_holding_time')
             elif signals[i - 1] is not None and signals[i - 1].side != position["side"]:
                 close_position(candle.open, candle, "reverse_signal")
 
-        daily_loss = max(0.0, (day_start_equity - equity) / day_start_equity) if day_start_equity > 0 else 0.0
+        daily_base = min(day_start_equity, config.initial_equity) if decision is not None else day_start_equity
+        daily_loss = max(0.0, (day_start_equity - equity) / daily_base) if daily_base > 0 else 0.0
         if daily_loss >= config.max_daily_loss_fraction:
             halted_days.add(day)
 
         # A signal is known only after the previous candle closes; fill at this candle's open.
         signal = signals[i - 1]
-        if position is None and equity > 0 and signal is not None and day not in halted_days and atr_values[i - 1] is not None:
+        if i >= trade_start_index and position is None and equity > 0 and signal is not None and day not in halted_days and atr_values[i - 1] is not None and (decision is None or i-last_exit_index >= decision['cooldown_bars']):
             side = signal.side
             entry = _adverse_price(candle.open, side, True, config.slippage_rate)
             stop_distance = signal.atr * config.stop_atr_multiple
             stop = entry - stop_distance if side == "long" else entry + stop_distance
-            qty = size_for_risk(equity, entry, stop, config.risk_fraction, config.max_notional_fraction)
+            sizing_stop = stop
+            if decision is not None:
+                distance_with_costs = abs(entry-stop) + entry*2*(config.fee_rate+config.slippage_rate)
+                sizing_stop = entry-distance_with_costs if side == 'long' else entry+distance_with_costs
+            sizing_equity = min(equity, config.initial_equity) if decision is not None else equity
+            qty = size_for_risk(sizing_equity, entry, sizing_stop, config.risk_fraction, config.max_notional_fraction)
             entry_fee = abs(entry * qty) * config.fee_rate
             if qty > 0 and equity > entry_fee:
-                position = {"side": side, "entry": entry, "entry_time": candle.timestamp, "qty": qty, "stop": stop, "entry_fee": entry_fee}
+                position = {"side": side, "entry": entry, "entry_time": candle.timestamp, "qty": qty, "stop": stop, "entry_fee": entry_fee, "entry_index": i}
+                if decision is not None:
+                    position["target"] = entry + signal.atr*decision["take_profit_atr_multiple"]*(1 if side == "long" else -1)
 
         # The active stop also applies to a position opened on this candle.
         if position is not None:
             hit = candle.low <= position["stop"] if position["side"] == "long" else candle.high >= position["stop"]
             if hit:
                 close_position(position["stop"], candle, "trailing_stop")
-                if day_start_equity > 0 and (day_start_equity - equity) / day_start_equity >= config.max_daily_loss_fraction:
+                if day_start_equity > 0 and (day_start_equity - equity) / daily_base >= config.max_daily_loss_fraction:
                     halted_days.add(day)
 
+        if position is not None and decision is not None:
+            target = position['target']
+            if (candle.high >= target if position['side'] == 'long' else candle.low <= target):
+                close_position(target, candle, 'take_profit')
+        # If stop and target both touch one bar, the stop wins conservatively.
         # Trail only after this candle has completed; it becomes active on the next candle.
-        if position is not None and atr_values[i] is not None:
+        if position is not None and atr_values[i] is not None and decision is None:
             distance = atr_values[i] * config.stop_atr_multiple
             candidate = candle.close - distance if position["side"] == "long" else candle.close + distance
             position["stop"] = max(position["stop"], candidate) if position["side"] == "long" else min(position["stop"], candidate)
+
+        mark = equity
+        if position is not None:
+            direction = 1 if position['side'] == 'long' else -1
+            mark += (candle.close-position['entry'])*position['qty']*direction - position['entry_fee'] - candle.close*position['qty']*config.fee_rate
+        mark_peak = max(mark_peak, mark)
+        mark_drawdown = max(mark_drawdown, (mark_peak-mark)/mark_peak if mark_peak > 0 else 0)
 
     if position is not None:
         close_position(candles[-1].close, candles[-1], "end_of_data")
     net = equity - config.initial_equity
     winners = sum(t.pnl > 0 for t in trades)
     return {
+        "strategy": strategy,
+        "max_mark_to_market_drawdown_fraction": mark_drawdown,
         "initial_equity": config.initial_equity,
         "final_equity": equity,
         "net_pnl": net,

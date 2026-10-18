@@ -1,5 +1,7 @@
 # Telegram notifications
 
+[New single-command operation and trend-pullback policy](REWORK.en.md). Older commands below retain ema-cross unless a strategy is selected.
+
 [Complete step-by-step Mac setup guide](START_HERE.en.md)
 
 [Русский](TELEGRAM.ru.md) · [Bybit Demo](REALTIME.en.md)

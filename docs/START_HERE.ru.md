@@ -1,5 +1,7 @@
 # Полный запуск на Mac: TradeBot, Bybit Demo, Ollama и Telegram
 
+[Новый единый запуск и стратегия trend-pullback](REWORK.ru.md). Старые команды ниже сохраняют режим ema-cross, если стратегия не указана.
+
 [English version](START_HERE.en.md) · [Главная](../README.md)
 
 Это пошаговая инструкция для текущей версии проекта. Основная рабочая папка во всех примерах — `~/Downloads/TradeBot-git`. Команды рассчитаны на Terminal / терминал VS Code в macOS, bash или zsh. Знак `$`, стрелки приглашения и текст `(.venv)` вводить не нужно: копируйте только содержимое блоков.
@@ -311,7 +313,7 @@ python -m dual_futures_bot --exchange bybit --mode bybit-demo --timeframe 15m --
 | `filled`, `average` | Исполненный объём и средняя цена, если вернула биржа |
 | `reduce_only: false` | Ордер на вход |
 | `reduce_only: true` | Сокращение/закрытие позиции |
-| `paper_equity: null` | Нормально для режима Demo |
+| `equity` | Наблюдаемое USDT equity в Demo или виртуальный капитал в paper |
 | `quote_source: orderbook_midpoint` | Цена-ориентир из середины bid/ask с временем стакана |
 | `ai_advisor.status: ok` | Свежий валидный отчёт ИИ прочитан |
 | `unavailable_or_stale` | Отчёт отсутствует, с ошибкой, для другого рынка или старше 10 минут |

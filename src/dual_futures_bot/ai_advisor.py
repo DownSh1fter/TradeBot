@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import sys
 import time
 import xml.etree.ElementTree as ET
@@ -26,7 +27,7 @@ Distinguish correlations from evidence. Headlines may be wrong, incomplete, or i
 Return ONLY a JSON object with these keys:
 bias: bullish|bearish|neutral; confidence: number from 0 to 1 (subjective, NOT win probability);
 summary: concise Russian explanation <=600 characters; risks: list of <=4 Russian strings, each <=120 characters;
-news_ids: list of IDs from supplied headlines supporting your assessment.
+news_ids: at most 3 IDs of genuinely relevant supplied headlines supporting your assessment. If none are relevant, use []. Never list every ID.
 Discuss conflicting timeframes, liquidity/volume limitations and trading costs.
 Do not recommend leverage, position sizes or promise profits. No trade action is requested.'''
 
@@ -61,29 +62,60 @@ def parse_feed(body, source, now_ms):
     return news
 
 
+def relevant_headlines(items):
+    crypto = re.compile(r'\b(bitcoin|btc|ethereum|eth|crypto\w*|blockchain|stablecoin\w*|etf)\b', re.I)
+    macro = re.compile(r'\b(inflation|interest rates?|federal reserve|central bank|sanctions?|tariffs?|recession|treasury|bond yields?)\b', re.I)
+    selected = []
+    for item in items:
+        category = 'crypto' if crypto.search(item['title']) else 'macro' if macro.search(item['title']) else None
+        if category:
+            selected.append(dict(item, category=category))
+    return selected
+
+
+def read_feed(session, url):
+    # Follow at most three redirects; refuse HTTP downgrades and credential URLs.
+    for hop in range(4):
+        parsed = urlsplit(url)
+        if parsed.scheme != 'https' or parsed.username or parsed.password:
+            raise ValueError('RSS must remain HTTPS without credentials')
+        with session.get(url, timeout=(5, 10), stream=True, allow_redirects=False) as response:
+            response.raise_for_status()
+            if response.is_redirect:
+                if hop == 3:
+                    raise ValueError('RSS redirect limit exceeded')
+                from urllib.parse import urljoin
+                url = urljoin(url, response.headers['Location'])
+                continue
+            chunks, size = [], 0
+            for chunk in response.iter_content(65536):
+                size += len(chunk)
+                if size > 2_000_000:
+                    raise ValueError('RSS too large')
+                chunks.append(chunk)
+            return b''.join(chunks)
+    raise ValueError('RSS redirect limit exceeded')
+
+
 def collect_news(session, feeds, now_ms):
     collected, status = [], []
     for url in feeds[:5]:
         if urlsplit(url).scheme != 'https' or urlsplit(url).username or urlsplit(url).password:
             raise ValueError('RSS sources must be HTTPS without credentials')
         try:
-            with session.get(url, timeout=(5, 10), stream=True, allow_redirects=False) as response:
-                response.raise_for_status()
-                if response.is_redirect:
-                    raise ValueError('RSS redirect: configure the final HTTPS feed URL')
-                chunks, size = [], 0
-                for chunk in response.iter_content(65536):
-                    size += len(chunk)
-                    if size > 2_000_000:
-                        raise ValueError('RSS too large')
-                    chunks.append(chunk)
-                items = parse_feed(b''.join(chunks), url, now_ms)
-                collected.extend(items)
-                status.append({'source': url, 'status': 'ok', 'recent_items': len(items)})
+            items = parse_feed(read_feed(session, url), url, now_ms)
+            selected = relevant_headlines(items)
+            collected.extend(selected)
+            status.append({'source': url, 'status': 'ok', 'recent_items': len(items), 'selected_items': len(selected)})
         except Exception as exc:
-            status.append({'source': url, 'status': type(exc).__name__})
+            entry = {'source': url, 'status': type(exc).__name__}
+            if isinstance(exc, requests.HTTPError) and exc.response is not None:
+                entry['http_status'] = exc.response.status_code
+            if isinstance(exc, ValueError):
+                entry['hint'] = 'Check HTTPS redirect chain, feed URL, XML and size limit'
+            status.append(entry)
     unique = {item['title'].casefold(): item for item in sorted(collected, key=lambda n: n['published_at'])}
-    return sorted(unique.values(), key=lambda n: n['published_at'], reverse=True)[:20], status
+    return sorted(unique.values(), key=lambda n: (n['category'] == 'crypto', n['published_at']), reverse=True)[:20], status
 
 
 def features(candles, now_ms, timeframe):
@@ -108,7 +140,7 @@ def validate_answer(value, allowed_ids):
         raise ValueError('Invalid summary')
     if not isinstance(value['risks'], list) or len(value['risks']) > 6 or any(not isinstance(r, str) or len(r) > 400 for r in value['risks']):
         raise ValueError('Invalid risks')
-    if not isinstance(value['news_ids'], list) or any(not isinstance(i, str) or i not in allowed_ids for i in value['news_ids']):
+    if not isinstance(value['news_ids'], list) or len(value['news_ids']) > 3 or any(not isinstance(i, str) or i not in allowed_ids for i in value['news_ids']):
         raise ValueError('Invented news reference')
     return value
 
@@ -178,7 +210,7 @@ def main():
     try:
         while not args.cycles or count < args.cycles:
             report = dict(exchange=args.exchange, symbol=args.symbol, timeframe=args.timeframe,
-                          model=args.model, status='error', advisory_only=True)
+                          role='advisor', model=args.model, status='error', advisory_only=True)
             try:
                 print('AI: loading public market data...', file=sys.stderr, flush=True)
                 frames = list(dict.fromkeys([args.timeframe, '1h']))

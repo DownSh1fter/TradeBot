@@ -1,5 +1,7 @@
 # Complete Mac setup: TradeBot, Bybit Demo, Ollama and Telegram
 
+[New single-command operation and trend-pullback policy](REWORK.en.md). Older commands below retain ema-cross unless a strategy is selected.
+
 [Русская версия](START_HERE.ru.md) · [Home](../README.md)
 
 This guide covers the current application. All examples use `~/Downloads/TradeBot-git`. Run commands in macOS Terminal or VS Code's terminal, using bash or zsh. Copy code blocks only: do not type prompt symbols, arrows or `(.venv)`.
@@ -311,7 +313,7 @@ Polling is roughly every ten seconds plus API/notification time. EMA signals req
 | `filled`, `average` | Filled amount and average price, if returned |
 | `reduce_only: false` | Entry order |
 | `reduce_only: true` | Position reduction/exit |
-| `paper_equity: null` | Expected in Demo mode |
+| `equity` | Observed Demo USDT equity or paper equity |
 | `quote_source: orderbook_midpoint` | Reference price is timestamped best bid/ask midpoint |
 | `ai_advisor.status: ok` | Fresh valid AI report loaded |
 | `unavailable_or_stale` | Missing, failed, mismatched or older-than-ten-minute report |

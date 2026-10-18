@@ -1,5 +1,11 @@
 # TradeBot / Dual Futures Bot
 
+**Новый единый запуск, стратегия отката и причины ожидания:** [Русский](docs/REWORK.ru.md)
+
+**Single-command operation, pullback policy and waiting diagnostics:** [English](docs/REWORK.en.md)
+
+Research/Demo only. No profitability established; see [validation evidence](docs/VALIDATION.md).
+
 **Пошаговая установка и запуск на Mac:** [Русский](docs/START_HERE.ru.md)
 
 **Complete Mac setup and operation:** [English](docs/START_HERE.en.md)
