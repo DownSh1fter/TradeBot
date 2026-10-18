@@ -1,5 +1,7 @@
 # Bybit Demo entry/exit smoke test
 
+[Complete step-by-step Mac setup guide](START_HERE.en.md)
+
 [Русский](DEMO_SMOKE.ru.md)
 
 One execution test without EMA/ATR signals: a market long entry followed by a reduce-only market exit for the observed position size. Bybit Demo Trading only; real-money execution is unsupported.

@@ -1,5 +1,7 @@
 # Local Ollama market observer
 
+[Complete step-by-step Mac setup guide](START_HERE.en.md)
+
 [Русский](AI.ru.md) · [Main guide](README.en.md)
 
 ## Implemented scope

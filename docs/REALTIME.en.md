@@ -1,5 +1,7 @@
 # Market analysis and Bybit Demo
 
+[Complete step-by-step Mac setup guide](START_HERE.en.md)
+
 [Русский](REALTIME.ru.md) · [Main guide](README.en.md)
 
 ## Modes and analysis

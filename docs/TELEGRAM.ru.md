@@ -1,5 +1,7 @@
 # Telegram-уведомления
 
+[Полная пошаговая инструкция для Mac](START_HERE.ru.md)
+
 [English](TELEGRAM.en.md) · [Bybit Demo](REALTIME.ru.md)
 
 Уведомления работают в `realtime-paper` и `bybit-demo`. Бот только отправляет сообщения в заданный чат; команд покупки/продажи через Telegram нет. Исторический бэктест не отправляет уведомлений.

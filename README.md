@@ -1,6 +1,14 @@
 # TradeBot / Dual Futures Bot
 
-[Русская документация](docs/README.ru.md) · [English documentation](docs/README.en.md)
+**Пошаговая установка и запуск на Mac:** [Русский](docs/START_HERE.ru.md)
+
+**Complete Mac setup and operation:** [English](docs/START_HERE.en.md)
+
+От скачивания проекта до Bybit Demo, Telegram и Ollama: команды, ввод ключей, вкладки терминала, обновление и устранение ошибок.
+
+From checkout to Bybit Demo, Telegram and Ollama: exact commands, credential entry, terminal tabs, updates and troubleshooting.
+
+[Описание стратегии / RU](docs/README.ru.md) · [Strategy reference / EN](docs/README.en.md)
 
 Симулятор фьючерсной стратегии EMA/ATR на публичных свечах Binance и Bybit.
 Поддерживает бэктест, анализ рынка с paper-сделками и ордера Bybit Demo. Реальной торговли нет.

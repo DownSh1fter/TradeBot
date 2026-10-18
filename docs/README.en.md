@@ -1,5 +1,7 @@
 # TradeBot — English guide
 
+[Complete step-by-step Mac setup guide](START_HERE.en.md)
+
 [Русский](README.ru.md) · [Home](../README.md)
 
 See [real-time analysis and Bybit Demo](REALTIME.en.md) for the new polling and Demo execution modes. The historical-mode guide follows.

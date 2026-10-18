@@ -1,5 +1,7 @@
 # Telegram notifications
 
+[Complete step-by-step Mac setup guide](START_HERE.en.md)
+
 [Русский](TELEGRAM.ru.md) · [Bybit Demo](REALTIME.en.md)
 
 Notifications work in `realtime-paper` and `bybit-demo`. This integration only sends messages; it accepts no trading commands. Historical backtests do not notify.

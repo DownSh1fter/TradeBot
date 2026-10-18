@@ -1,5 +1,7 @@
 # Анализ рынка и Bybit Demo
 
+[Полная пошаговая инструкция для Mac](START_HERE.ru.md)
+
 [English](REALTIME.en.md) · [Основное руководство](README.ru.md)
 
 ## Что добавлено
