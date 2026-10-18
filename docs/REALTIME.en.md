@@ -1,5 +1,7 @@
 # Market analysis and Bybit Demo
 
+Complete current installation, configuration and operations guide: [MANUAL.en.md](MANUAL.en.md).
+
 [New single-command operation and trend-pullback policy](REWORK.en.md). Older commands below retain ema-cross unless a strategy is selected.
 
 [Complete step-by-step Mac setup guide](START_HERE.en.md)

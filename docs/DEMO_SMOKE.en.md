@@ -1,5 +1,7 @@
 # Bybit Demo entry/exit smoke test
 
+Complete current installation, configuration and operations guide: [MANUAL.en.md](MANUAL.en.md).
+
 [Complete step-by-step Mac setup guide](START_HERE.en.md)
 
 [Русский](DEMO_SMOKE.ru.md)

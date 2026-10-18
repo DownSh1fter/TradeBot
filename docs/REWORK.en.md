@@ -1,5 +1,7 @@
 # Updated operation: one trader, explicit decisions and a testable policy
 
+Complete current installation, configuration and operations guide: [MANUAL.en.md](MANUAL.en.md).
+
 [Русский](REWORK.ru.md) · [Full installation/credentials](START_HERE.en.md)
 
 ## Diagnosis from the supplied logs

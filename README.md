@@ -1,5 +1,13 @@
 # TradeBot / Dual Futures Bot
 
+**Полное руководство — от установки до ежедневной работы:** [Русский](docs/MANUAL.ru.md)
+
+**Complete setup, configuration and operations manual:** [English](docs/MANUAL.en.md)
+
+22 раздела: Mac/VS Code/Python, обновление, Bybit Demo и ключи, Telegram, Ollama, единый запуск, все параметры, стратегии и риск, журналы, бэктест, восстановление и диагностика.
+
+22 sections covering Mac/VS Code/Python, updates, Bybit Demo credentials, Telegram, Ollama, unified startup, every option, strategies and risk, journals, backtesting, recovery and troubleshooting.
+
 **Новый единый запуск, стратегия отката и причины ожидания:** [Русский](docs/REWORK.ru.md)
 
 **Single-command operation, pullback policy and waiting diagnostics:** [English](docs/REWORK.en.md)
