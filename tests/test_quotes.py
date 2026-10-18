@@ -27,7 +27,7 @@ class QuoteTests(unittest.TestCase):
     def test_invalid_orderbooks_rejected(self):
         for book in ({'timestamp': 0, 'bids': [[99]], 'asks': [[101]]},
                      {'timestamp': None, 'bids': [[99]], 'asks': [[101]]},
-                     {'timestamp': 101_000, 'bids': [[99]], 'asks': [[101]]},
+                     {'timestamp': 103_000, 'bids': [[99]], 'asks': [[101]]},
                      {'timestamp': 99_000, 'bids': [], 'asks': [[101]]},
                      {'timestamp': 99_000, 'bids': [[102]], 'asks': [[101]]},
                      {'timestamp': 99_000, 'bids': [[float('nan')]], 'asks': [[101]]}):
@@ -41,3 +41,24 @@ class QuoteTests(unittest.TestCase):
         ex.fetch_ticker.return_value = {'timestamp': 1, 'last': 100}
         with self.assertRaises(ValueError): fetch_quote(ex, 'BTC')
         ex.fetch_order_book.assert_not_called()
+
+
+    def test_small_clock_skew_allowed_but_future_quotes_rejected(self):
+        from dual_futures_bot.realtime import QuoteUnavailable
+        ex = self.exchange()
+        ex.fetch_order_book.return_value['timestamp'] = 100_169
+        self.assertEqual(fetch_quote(ex, 'BTC')['age_seconds'], -.169)
+        ex.fetch_order_book.return_value['timestamp'] = 103_000
+        with self.assertRaises(QuoteUnavailable) as caught:
+            fetch_quote(ex, 'BTC')
+        self.assertEqual(caught.exception.details['reason'], 'future_timestamp')
+        self.assertEqual(caught.exception.details['age_seconds'], -3)
+
+    def test_stale_price_error_includes_actual_age_and_source(self):
+        from dual_futures_bot.realtime import QuoteUnavailable
+        ex = self.exchange()
+        ex.fetch_order_book.return_value['timestamp'] = 1000
+        with self.assertRaises(QuoteUnavailable) as caught:
+            fetch_quote(ex, 'BTC')
+        self.assertEqual(caught.exception.details['age_seconds'], 99)
+        self.assertEqual(caught.exception.details['source'], 'orderbook_midpoint')

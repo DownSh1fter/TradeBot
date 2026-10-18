@@ -124,3 +124,47 @@ class RealtimeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             demo_action(ex, 'BTC/USDT:USDT', self.analysis, 100, self.config, self.state, lambda s: None)
         self.assertTrue(self.state['pending_order'])
+
+    def test_quote_outage_does_not_consume_signal_then_recovers(self):
+        import contextlib
+        import io
+        import json
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from dual_futures_bot.realtime import QuoteUnavailable, run, step
+        ex = self.exchange()
+        ex.market.return_value = {'swap': True, 'linear': True, 'settle': 'USDT'}
+        ex.timeframes = {'1m': '1m'}
+        ex.parse_timeframe.return_value = 60
+        ex.milliseconds.return_value = 65 * 60000
+        ex.fetch_ohlcv.return_value = [[i*60000,100,101,99,100,1] for i in range(65)]
+        good = {'timestamp': 65*60000, 'last': 100, 'source': 'ticker_last', 'age_seconds': 0}
+        with tempfile.TemporaryDirectory() as directory, patch('ccxt.bybit', return_value=ex), patch('dual_futures_bot.realtime.fetch_quote', side_effect=[QuoteUnavailable('stale_quote', 'ticker_last'), good]), patch('dual_futures_bot.realtime.time.sleep'), patch('dual_futures_bot.realtime.step', wraps=step) as execute, contextlib.redirect_stdout(io.StringIO()) as output:
+            path = Path(directory)/'state.json'
+            run('bybit', 'BTC/USDT:USDT', '1m', 100, 10000, path, cycles=2)
+            self.assertEqual(execute.call_count, 1)
+            self.assertEqual(json.loads(path.read_text())['last_candle'], 64*60000)
+            self.assertIn('quote_unavailable', output.getvalue())
+            self.assertIn('quote_recovered', output.getvalue())
+            self.assertFalse(path.with_suffix('.json.lock').exists())
+
+    def test_invalid_quote_never_calls_demo_execution(self):
+        import contextlib
+        import io
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from dual_futures_bot.realtime import QuoteUnavailable, run
+        ex = self.exchange()
+        ex.market.return_value = {'swap': True, 'linear': True, 'settle': 'USDT'}
+        ex.timeframes = {'1m': '1m'}
+        ex.parse_timeframe.return_value = 60
+        ex.milliseconds.return_value = 65 * 60000
+        ex.fetch_ohlcv.return_value = [[i*60000,100,101,99,100,1] for i in range(65)]
+        with tempfile.TemporaryDirectory() as directory, patch('dual_futures_bot.demo.connect_demo', return_value=ex), patch('dual_futures_bot.demo.demo_action') as execute, patch('dual_futures_bot.realtime.fetch_quote', side_effect=QuoteUnavailable('stale_quote', 'orderbook_midpoint')), contextlib.redirect_stdout(io.StringIO()):
+            path = Path(directory)/'state.json'
+            run('bybit', 'BTC/USDT:USDT', '1m', 100, 10000, path, cycles=1, demo=True)
+            execute.assert_not_called()
+            ex.create_order.assert_not_called()
+            self.assertFalse(path.exists())

@@ -12,27 +12,46 @@ from .simulator import RiskConfig, size_for_risk
 from .strategy import ema_cross_signals
 
 
+class QuoteUnavailable(ValueError):
+    """Public quote rejected before any order processing; safe to poll again."""
+    def __init__(self, reason, source, timestamp=None, now=None):
+        self.details = {'reason': reason, 'source': source}
+        if type(timestamp) in (int, float) and math.isfinite(timestamp) and now is not None:
+            self.details.update(timestamp_ms=timestamp, local_time_ms=now, age_seconds=round((now-timestamp)/1000, 3))
+        super().__init__(json.dumps(self.details))
+
+
 def fetch_quote(exchange, symbol):
-    """Use a timestamped order-book midpoint when ticker time is unavailable."""
+    """Use timestamped quotes, allowing at most 2 seconds of clock skew ahead."""
     ticker = exchange.fetch_ticker(symbol)
     if ticker.get('timestamp') is None:
+        source = 'orderbook_midpoint'
         book = exchange.fetch_order_book(symbol, limit=1)
         if not book.get('bids') or not book.get('asks'):
-            raise ValueError('quote order book is empty')
-        bid, ask = float(book['bids'][0][0]), float(book['asks'][0][0])
+            raise QuoteUnavailable('empty_orderbook', source)
+        try:
+            bid, ask = float(book['bids'][0][0]), float(book['asks'][0][0])
+        except (ValueError, TypeError, IndexError):
+            raise QuoteUnavailable('invalid_bid_ask', source) from None
         if not all(math.isfinite(p) and p > 0 for p in (bid, ask)) or bid > ask:
-            raise ValueError('quote order book has invalid bid/ask')
-        ticker = {'timestamp': book.get('timestamp'), 'last': (bid + ask) / 2,
-                  'source': 'orderbook_midpoint'}
+            raise QuoteUnavailable('invalid_bid_ask', source)
+        ticker = {'timestamp': book.get('timestamp'), 'last': (bid + ask) / 2, 'source': source}
     else:
         ticker = dict(ticker, source='ticker_last')
     now = exchange.milliseconds()
     timestamp = ticker.get('timestamp')
-    if timestamp is None or not isinstance(timestamp, (int, float)) or not math.isfinite(timestamp) or not 0 <= now - timestamp <= 60_000:
-        raise ValueError('quote missing exchange timestamp or older than 60 seconds; check system clock')
-    price = float(ticker['last'])
+    if type(timestamp) not in (int, float) or not math.isfinite(timestamp):
+        raise QuoteUnavailable('missing_or_invalid_timestamp', ticker['source'])
+    age = now - timestamp
+    if age < -2000 or age > 60_000:
+        raise QuoteUnavailable('future_timestamp' if age < -2000 else 'stale_quote', ticker['source'], timestamp, now)
+    try:
+        price = float(ticker['last'])
+    except (KeyError, TypeError, ValueError):
+        raise QuoteUnavailable('invalid_price', ticker['source']) from None
     if not math.isfinite(price) or price <= 0:
-        raise ValueError('invalid quote price')
+        raise QuoteUnavailable('invalid_price', ticker['source'])
+    ticker['age_seconds'] = round(age / 1000, 3)
     return ticker
 
 
@@ -144,15 +163,36 @@ def run(exchange_id, symbol, timeframe, limit, equity, state_path, poll_seconds=
             raise ValueError('unsupported timeframe')
         interval = exchange.parse_timeframe(timeframe) * 1000
         count = 0
+        quote_warning_at = None
         while not cycles or count < cycles:
             rows = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
             now = exchange.milliseconds()
             candles = [Candle(*row) for row in rows if row[0] + interval <= now]
             analysis = analyze(candles, now, interval)
-            ticker = fetch_quote(exchange, symbol)
+            try:
+                ticker = fetch_quote(exchange, symbol)
+            except QuoteUnavailable as exc:
+                # Do not advance signals/state, execute orders or simulate stop fills.
+                warning = dict(status='quote_unavailable', symbol=symbol, **exc.details,
+                               events=[], note='Cycle skipped; existing positions may remain open. Paper stops cannot run without a valid price.')
+                print(json.dumps(warning), flush=True)
+                clock = time.monotonic()
+                if quote_warning_at is None or clock - quote_warning_at >= 300:
+                    notifier.send('Нет свежей цены / Quote unavailable', warning)
+                    quote_warning_at = clock
+                count += 1  # --cycles counts polling attempts, including rejected quotes.
+                if not cycles or count < cycles:
+                    time.sleep(poll_seconds)
+                continue
+            if quote_warning_at is not None:
+                recovery = dict(status='quote_recovered', symbol=symbol, source=ticker['source'])
+                print(json.dumps(recovery), flush=True)
+                notifier.send('Цена восстановлена / Quote recovered', recovery)
+                quote_warning_at = None
             now = exchange.milliseconds()
             analysis = analyze(candles, now, interval)
             analysis['quote_source'] = ticker['source']
+            analysis['quote_age_seconds'] = ticker['age_seconds']
             if ai_report:
                 from .ai_advisor import load_report
                 analysis['ai_advisor'] = load_report(ai_report, exchange_id, symbol, timeframe, now)

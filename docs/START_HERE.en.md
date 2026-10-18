@@ -442,6 +442,12 @@ PY
 
 When asking for help, provide error type/text, `pwd`, Python/macOS versions and relevant log lines with credentials removed. Never post the full process environment.
 
+### `quote_unavailable` and stale AI reports
+
+Current normal trading loops skip rejected quotes without orders rather than exiting. Inspect `reason`, `source`, `age_seconds` and eventual `quote_recovered`. Exchange time may be at most two seconds ahead; age above 60 seconds is still rejected. Persistent warnings require checking Bybit/network/clock; no orders does not prove an existing position is closed. Paper stops cannot run without a valid quote.
+
+`ai_advisor: unavailable_or_stale` does not cause quote failures. Check tab B, latest report status/hint, path and matching timeframe. Slow inference plus pauses can create gaps in fresh reports. Stop only the observer and try `--interval 60 --timeout 480 --max-tokens 512` instead of the default 300-second pause. This increases load and cannot guarantee freshness. The ten-minute freshness limit remains; old recommendations never become trade signals.
+
 ## 16. Files and reference guides
 
 | File | Contents |

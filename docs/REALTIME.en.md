@@ -57,6 +57,10 @@ Telegram: [Setup / Настройка](TELEGRAM.en.md)
 
 ## Bybit quote timestamp fix
 
-CCXT may return a Bybit ticker with a price but no timestamp. The bot then retrieves the order book and uses the best bid/ask midpoint with the book's exchange timestamp. Analysis reports `quote_source` as `orderbook_midpoint` or `ticker_last`. This is a sizing reference, not a guaranteed fill price. Quotes older than 60 seconds, in the future, missing exchange time or with invalid books are rejected. Local receipt time never replaces exchange time. If freshness checks still fail, verify automatic system clock synchronization and network latency.
+CCXT may return a Bybit ticker with a price but no timestamp. The bot then retrieves the order book and uses the best bid/ask midpoint with the book's exchange timestamp. Analysis reports `quote_source` as `orderbook_midpoint` or `ticker_last`. This is a sizing reference, not a guaranteed fill price. Quotes older than 60 seconds, more than 2 seconds ahead of the local clock, missing exchange time or with invalid books are rejected. Local receipt time never replaces exchange time. If freshness checks still fail, verify automatic system clock synchronization and network latency.
 
 [Demo entry/exit test / Проверка входа и выхода](DEMO_SMOKE.en.md)
+
+## Temporary quote rejection
+
+`quote_unavailable` skips the iteration until the next poll: no orders, no consumed candle signal, no state overwrite. `reason`, `source` and numeric-timestamp `age_seconds` explain rejection. Negative age means exchange time is ahead of local time; tolerance is at most 2 seconds. Maximum stale age remains 60 seconds. Recovery emits `quote_recovered`. Telegram warns initially and then at most every five minutes, and separately on recovery. `--cycles` counts attempts, including rejected quotes: completing a warning-only attempt does not validate market readiness. Without a valid price, paper stops cannot run and no Demo orders are submitted; existing positions can remain open. Verify exchange stops in Bybit. API network errors and ambiguous orders still stop the process; only normal polling resumes after data rejection. One-shot `demo_smoke` still stops on rejected quotes.
